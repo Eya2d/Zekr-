@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>موقع الذكر</title>
+<script src="https://cdn.jsdelivr.net/gh/IconCanyon/Icon-canyon@main/Wave-cloud-3.0.0.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+*{
+    box-sizing:border-box;
+    font-family:'Tajawal',sans-serif;
+}
+
+body{
+    margin:0;
+    background:#f0f4f8;
+    padding:20px;
+    min-height:100vh;
+    user-select: none;
+}
+
+.container{
+    max-width:700px;
+    margin:auto;
+}
+
+button {
+    user-select: none;
+    cursor: context-menu !important;
+}
+
+#addZekr{
+    width:100%;
+    border:none;
+    padding:16px;
+    font-size:20px;
+    border-radius:40px;
+    cursor:pointer;
+    background:#1e88e5;
+    color:#fff;
+    font-family:'Tajawal',sans-serif;
+    transition:.2s;
+}
+
+#records{
+    margin-top:20px;
+}
+
+#savedRecords{
+    margin-top:20px;
+}
+
+.saved-title{
+    margin-top:25px;
+    margin-bottom:15px;
+    font-size:24px;
+    font-weight:bold;
+}
+
+.record,
+.saved-record{
+    background: #fff;
+    border-radius: 16px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 10px rgb(0 72 161 / 14%);
+}
+
+.record h3,
+.saved-record h3{
+    margin:0 0 12px;
+}
+
+.controls{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+}
+
+.controls button{
+    border: none;
+    padding: 10px 14px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 15px;
+    font-family: 'Tajawal', sans-serif;
+    transition: .25s;
+    background: #f0f8ff;
+    color: #0aa5ff;
+}
+
+.controls button:hover{
+    transform:scale(1.05);
+}
+
+.save-btn{
+    background:#43a047;
+    color:#fff;
+}
+
+.cancel-btn{
+    background:#e53935;
+    color:#fff;
+}
+
+.toggle-btn{
+    background:#fb8c00;
+    color:#fff;
+}
+
+.counter{
+    background: #ffffff;
+    color: #1491ff;
+    padding: 10px 14px;
+    border-radius: 10px;
+    min-width: 60px;
+    text-align: center;
+    font-size: 18px;
+    box-shadow: 0 0 0 2px #4eacff5c inset;
+}
+
+.completed{
+    margin-top:10px;
+    background:#e8f5e9;
+    border:2px solid #43a047;
+    padding:14px;
+    border-radius:14px;
+    font-size:18px;
+    font-weight:bold;
+}
+
+/* mic pulse animation */
+@keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0 rgba(251,140,0,.6); }
+    70%  { box-shadow: 0 0 0 10px rgba(251,140,0,0); }
+    100% { box-shadow: 0 0 0 0  rgba(251,140,0,0); }
+}
+.toggle-btn.listening {
+    animation: pulse-ring 1.2s ease infinite;
+}
+
+.overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.5);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:999;
+    opacity:0;
+    visibility:hidden;
+    transition:
+    opacity .35s ease,
+    visibility .35s ease;
+}
+
+.overlay.show{
+    opacity:1;
+    visibility:visible;
+}
+
+.modal{
+    width:95%;
+    max-width:420px;
+    background:#fff;
+    border-radius:20px;
+    padding:20px;
+    transform:scale(.7) translateY(40px);
+    opacity:0;
+    transition:
+    transform .35s ease,
+    opacity .35s ease;
+}
+
+.overlay.show .modal{
+    transform:scale(1) translateY(0);
+    opacity:1;
+}
+
+.modal input{
+    width:100%;
+    padding:14px;
+    border-radius:12px;
+    border:2px solid #ddd;
+    outline:none;
+    font-size:18px;
+    font-family:'Tajawal',sans-serif;
+}
+
+.modal input:focus{
+    border-color:#1e88e5;
+}
+
+.numbers{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-top:15px;
+}
+
+.num-btn{
+    border: none;
+    padding: 14px;
+    border-radius: 40px;
+    cursor: pointer;
+    background: #f0f8ff;
+    color: #0aa5ff;
+    font-size: 18px;
+    font-family: 'Tajawal', sans-serif;
+    transition: .25s;
+}
+.num-btn .ripple {
+    background-color: #3ba0ff23;
+}
+
+.num-btn:hover{
+    transform:scale(1.05);
+}
+
+.num-btn.active{
+    background:#1e88e5;
+    color:#fff;
+}
+
+#confirmBtn{
+    width:100%;
+    margin-top:15px;
+    border:none;
+    padding:14px;
+    border-radius:40px;
+    font-size:18px;
+    font-family:'Tajawal',sans-serif;
+    cursor:pointer;
+    background:#4aaaff54;
+    color:#fff;
+    transition:.25s;
+}
+
+#confirmBtn.active{
+    background:#4aaaff;
+}
+
+.saved-record{
+    /* border: 2px solid #4da7e5; */
+    border: 2px solid #0000;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.saved-record-info h3{
+    margin:0 0 6px;
+}
+
+.saved-count{
+    font-size:18px;
+    font-weight:bold;
+}
+
+.delete-saved-btn{
+    border: none;
+    background: #ff878429;
+    color: #e53935;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 15px;
+    font-family: 'Tajawal', sans-serif;
+    transition: .25s;
+    white-space: nowrap;
+}
+
+.delete-saved-btn:hover{
+    transform:scale(1.05);
+}
+.delete-saved-btn:active {
+    opacity: .7;
+}
+.delete-saved-btn .ripple {
+    background: #ff868454;
+}
+
+/* interim transcript display */
+.interim-display {
+    margin-top:8px;
+    min-height:28px;
+    font-size:15px;
+    color:#888;
+    font-style:italic;
+    transition:color .2s;
+}
+.interim-display.match {
+    color:#43a047;
+    font-weight:bold;
+}
+
+.num-btn.active .ripple, #addZekr .ripple, #confirmBtn .ripple {
+    background-color: rgba(255, 255, 255, 0.295);
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <button id="addZekr" class="Wave-cloud">إضافة ذكر جديد</button>
+
+    <div id="records"></div>
+
+    <div class="saved-title">الأذكار المحفوظة</div>
+
+    <div id="savedRecords" class="Wave-all"></div>
+
+</div>
+
+<div class="overlay" id="overlay">
+
+    <div class="modal">
+
+        <input
+        type="text"
+        id="zekrInput"
+        placeholder="اكتب اسم الذكر">
+
+        <div class="numbers Wave-all">
+            <button class="num-btn" data-num="100">100</button>
+            <button class="num-btn" data-num="200">200</button>
+            <button class="num-btn" data-num="400">400</button>
+            <button class="num-btn" data-num="600">600</button>
+            <button class="num-btn" data-num="800">800</button>
+            <button class="num-btn" data-num="1000">1000</button>
+        </div>
+
+        <button id="confirmBtn" class="Wave-cloud">موافق</button>
+
+    </div>
+
+</div>
+
+<script>
+// ─── Storage helpers ─────────────────────────────────────────────────────────
+const STORAGE_KEY = "zekr_saved_records";
+
+function loadSaved(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch(e){ return []; }
+}
+
+function persistSaved(arr){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+}
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+const addBtn       = document.getElementById("addZekr");
+const overlay      = document.getElementById("overlay");
+const zekrInput    = document.getElementById("zekrInput");
+const confirmBtn   = document.getElementById("confirmBtn");
+const records      = document.getElementById("records");
+const savedRecords = document.getElementById("savedRecords");
+
+let selectedNumber = null;
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openModal(){
+    overlay.classList.add("show");
+    zekrInput.value = "";
+    selectedNumber = null;
+    document.querySelectorAll(".num-btn").forEach(btn=>btn.classList.remove("active"));
+    confirmBtn.classList.remove("active");
+    setTimeout(()=>zekrInput.focus(), 350);
+}
+
+function closeModal(){
+    overlay.classList.remove("show");
+}
+
+addBtn.addEventListener("click", openModal);
+
+overlay.addEventListener("click",(e)=>{
+    if(e.target === overlay) closeModal();
+});
+
+document.querySelectorAll(".num-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+        document.querySelectorAll(".num-btn").forEach(b=>b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedNumber = Number(btn.dataset.num);
+        checkValid();
+    });
+});
+
+zekrInput.addEventListener("input", checkValid);
+
+function checkValid(){
+    const hasText = zekrInput.value.trim() !== "";
+    confirmBtn.classList.toggle("active", !!(hasText && selectedNumber));
+}
+
+confirmBtn.addEventListener("click",()=>{
+    if(!confirmBtn.classList.contains("active")) return;
+    const zekrName = zekrInput.value.trim();
+    const target   = selectedNumber;
+    closeModal();
+    createRecord(zekrName, target);
+});
+
+// ─── Arabic normalisation ─────────────────────────────────────────────────────
+function normalizeArabic(text){
+    return text
+        .replace(/[ًٌٍَُِّْـ]/g,'')
+        .replace(/[أإآ]/g,'ا')
+        .replace(/ة/g,'ه')
+        .replace(/ى/g,'ي')
+        .replace(/\s+/g,' ')
+        .trim()
+        .toLowerCase();
+}
+
+// ─── Token-overlap score (0..1) ───────────────────────────────────────────────
+// Returns 1.0 when every target token appears in the spoken tokens.
+// This handles extra filler words the recogniser may insert.
+function tokenScore(spoken, target){
+    const sp = spoken.split(' ').filter(Boolean);
+    const tg = target.split(' ').filter(Boolean);
+    if(tg.length === 0) return 0;
+    const matched = tg.filter(w => sp.includes(w)).length;
+    return matched / tg.length;
+}
+
+// ─── Create active record ─────────────────────────────────────────────────────
+function createRecord(name, target){
+    let count     = 0;
+    let listening = false;
+    let cooldown  = false;          // blocks duplicate within COOLDOWN_MS
+
+    const normalizedTarget = normalizeArabic(name);
+    const SCORE_THRESHOLD  = 0.85;  // 85 % of target tokens must be present
+    const COOLDOWN_MS      = 800;   // min ms between two accepted hits
+
+    const box = document.createElement("div");
+    box.className = "record";
+    box.innerHTML = `
+        <h3>${name}</h3>
+        <div class="controls">
+            <button class="save-btn">حفظ</button>
+            <button class="cancel-btn">إلغاء</button>
+            <button class="toggle-btn">تشغيل</button>
+            <span class="counter">0</span>
+        </div>
+        <div class="interim-display"></div>
+        <div class="finish-area"></div>
+    `;
+    records.prepend(box);
+
+    const saveBtn     = box.querySelector(".save-btn");
+    const cancelBtn   = box.querySelector(".cancel-btn");
+    const toggleBtn   = box.querySelector(".toggle-btn");
+    const counter     = box.querySelector(".counter");
+    const finishArea  = box.querySelector(".finish-area");
+    const interimDisp = box.querySelector(".interim-display");
+
+    let recognition;
+
+    if("webkitSpeechRecognition" in window || "SpeechRecognition" in window){
+        const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SRClass();
+        recognition.lang            = "ar-SA";
+        recognition.continuous      = true;
+        recognition.interimResults  = true;   // show live feedback while speaking
+        recognition.maxAlternatives = 3;       // check multiple alternatives
+
+        recognition.onresult = function(event){
+            for(let i = event.resultIndex; i < event.results.length; i++){
+                const result = event.results[i];
+
+                // ── Show interim transcript live ──────────────────────────
+                if(!result.isFinal){
+                    const interim = normalizeArabic(result[0].transcript);
+                    const sc = tokenScore(interim, normalizedTarget);
+                    interimDisp.textContent = result[0].transcript;
+                    interimDisp.className   = "interim-display" + (sc >= SCORE_THRESHOLD ? " match" : "");
+                    continue;
+                }
+
+                // ── Final result ──────────────────────────────────────────
+                interimDisp.textContent = "";
+                interimDisp.className   = "interim-display";
+
+                if(cooldown) continue;   // ignore rapid fire
+
+                // Find best score among all alternatives
+                let bestScore = 0;
+                for(let a = 0; a < result.length; a++){
+                    const t = normalizeArabic(result[a].transcript);
+                    const s = tokenScore(t, normalizedTarget);
+                    if(s > bestScore) bestScore = s;
+                }
+
+                if(bestScore >= SCORE_THRESHOLD){
+                    cooldown = true;
+                    setTimeout(()=>{ cooldown = false; }, COOLDOWN_MS);
+
+                    count++;
+                    counter.textContent = count;
+                    counter.animate(
+                        [{transform:"scale(1.35)"},{transform:"scale(1)"}],
+                        {duration:160}
+                    );
+
+                    if(count >= target){
+                        stopListening();
+                        const done = document.createElement("div");
+                        done.className   = "completed";
+                        done.textContent = `${name} - اكتمل العدد (${target})`;
+                        finishArea.innerHTML = "";
+                        finishArea.appendChild(done);
+                    }
+                }
+            }
+        };
+
+        recognition.onerror = function(e){
+            // 'no-speech' fires normally during silence — ignore it
+            if(e.error === "no-speech") return;
+            stopListening();
+        };
+
+        // Auto-restart so the session stays alive without gaps
+        recognition.onend = function(){
+            if(listening) recognition.start();
+        };
+    }
+
+    function startListening(){
+        if(!recognition){ alert("المتصفح لا يدعم التعرف على الصوت"); return; }
+        listening = true;
+        toggleBtn.textContent = "إيقاف";
+        toggleBtn.classList.add("listening");
+        recognition.start();
+    }
+
+    function stopListening(){
+        listening = false;
+        toggleBtn.textContent = "تشغيل";
+        toggleBtn.classList.remove("listening");
+        if(recognition) recognition.stop();
+    }
+
+    toggleBtn.addEventListener("click",()=>{
+        listening ? stopListening() : startListening();
+    });
+
+    cancelBtn.addEventListener("click",()=>{
+        stopListening();
+        box.remove();
+    });
+
+    saveBtn.addEventListener("click",()=>{
+        stopListening();
+
+        const entry = { name, count, target, id: Date.now() };
+        const arr   = loadSaved();
+        arr.unshift(entry);
+        persistSaved(arr);
+
+        renderSavedEntry(entry);
+        box.remove();
+    });
+}
+
+// ─── Render one saved entry ───────────────────────────────────────────────────
+function renderSavedEntry(entry){
+    const savedBox = document.createElement("div");
+    savedBox.className  = "saved-record";
+    savedBox.dataset.id = entry.id;
+    savedBox.innerHTML  = `
+        <div class="saved-record-info">
+            <h3>${entry.name}</h3>
+            <div class="saved-count">العدد المسجل: ${entry.count} / ${entry.target}</div>
+        </div>
+        <button class="delete-saved-btn">حذف</button>
+    `;
+
+    savedBox.querySelector(".delete-saved-btn").addEventListener("click",()=>{
+        const arr = loadSaved().filter(e => e.id !== entry.id);
+        persistSaved(arr);
+        savedBox.remove();
+    });
+
+    savedRecords.prepend(savedBox);
+}
+
+// ─── Load persisted records on page start ────────────────────────────────────
+(function init(){
+    const arr = loadSaved();
+    // iterate oldest-first so prepend keeps newest at top
+    for(let i = arr.length - 1; i >= 0; i--){
+        renderSavedEntry(arr[i]);
+    }
+})();
+</script>
+
+</body>
+</html>
