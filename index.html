@@ -29,6 +29,7 @@ body{
 button {
     user-select: none;
     cursor: context-menu !important;
+    line-height: 0;
 }
 
 #addZekr{
@@ -42,6 +43,7 @@ button {
     color:#fff;
     font-family:'Tajawal',sans-serif;
     transition:.2s;
+    height: 60px;
 }
 
 #records{
@@ -143,18 +145,17 @@ button {
 }
 
 .overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.5);
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    z-index:999;
-    opacity:0;
-    visibility:hidden;
-    transition:
-    opacity .35s ease,
-    visibility .35s ease;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .5);
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    padding-top: 40px;
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .35s ease, visibility .35s ease;
 }
 
 .overlay.show{
@@ -211,6 +212,7 @@ button {
     font-size: 18px;
     font-family: 'Tajawal', sans-serif;
     transition: .25s;
+    height: 53px;
 }
 .num-btn .ripple {
     background-color: #3ba0ff23;
@@ -237,6 +239,7 @@ button {
     background:#4aaaff54;
     color:#fff;
     transition:.25s;
+    height: 53px;
 }
 
 #confirmBtn.active{
@@ -274,6 +277,7 @@ button {
     font-family: 'Tajawal', sans-serif;
     transition: .25s;
     white-space: nowrap;
+    height: 40px;
 }
 
 .delete-saved-btn:hover{
