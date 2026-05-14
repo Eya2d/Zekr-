@@ -100,18 +100,18 @@ button {
 }
 
 .save-btn{
-    background:#43a047;
-    color:#fff;
+    background:#43a047 !important;
+    color:#fff !important;
 }
 
 .cancel-btn{
-    background:#e53935;
-    color:#fff;
+    background:#e53935 !important;
+    color:#fff !important;
 }
 
 .toggle-btn{
-    background:#fb8c00;
-    color:#fff;
+    background:#fb8c00 !important;
+    color:#fff !important;
 }
 
 .counter{
@@ -248,7 +248,6 @@ button {
 }
 
 .saved-record{
-    /* border: 2px solid #4da7e5; */
     border: 2px solid #0000;
     background: #ffffff;
     display: flex;
@@ -293,16 +292,20 @@ button {
 
 /* interim transcript display */
 .interim-display {
-    margin-top:8px;
-    min-height:28px;
-    font-size:15px;
-    color:#888;
-    font-style:italic;
-    transition:color .2s;
+    margin-top: 8px;
+    min-height: 28px;
+    font-size: 15px;
+    color: #aaa;
+    font-style: italic;
+    transition: color .15s, font-weight .15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .interim-display.match {
-    color:#43a047;
-    font-weight:bold;
+    color: #43a047;
+    font-weight: bold;
+    font-style: normal;
 }
 
 .num-btn.active .ripple, #addZekr .ripple, #confirmBtn .ripple {
@@ -349,7 +352,7 @@ button {
 </div>
 
 <script>
-// ─── Storage helpers ─────────────────────────────────────────────────────────
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 const STORAGE_KEY = "zekr_saved_records";
 
 function loadSaved(){
@@ -386,10 +389,7 @@ function closeModal(){
 }
 
 addBtn.addEventListener("click", openModal);
-
-overlay.addEventListener("click",(e)=>{
-    if(e.target === overlay) closeModal();
-});
+overlay.addEventListener("click",(e)=>{ if(e.target === overlay) closeModal(); });
 
 document.querySelectorAll(".num-btn").forEach(btn=>{
     btn.addEventListener("click",()=>{
@@ -428,25 +428,52 @@ function normalizeArabic(text){
 }
 
 // ─── Token-overlap score (0..1) ───────────────────────────────────────────────
-// Returns 1.0 when every target token appears in the spoken tokens.
-// This handles extra filler words the recogniser may insert.
-function tokenScore(spoken, target){
+// كل كلمة في الهدف يجب أن تظهر في ما قيل
+function tokenScore(spoken, targetNorm){
     const sp = spoken.split(' ').filter(Boolean);
-    const tg = target.split(' ').filter(Boolean);
+    const tg = targetNorm.split(' ').filter(Boolean);
     if(tg.length === 0) return 0;
     const matched = tg.filter(w => sp.includes(w)).length;
     return matched / tg.length;
+}
+
+// ─── هل النص المؤقت يحتوي على الذكر كاملاً ويكمل عند النطق بآخر كلمة؟ ──────
+// نبحث عن وجود كل كلمات الهدف داخل ما قيل (بالترتيب تقريباً)
+function containsFullZekr(spokenNorm, targetNorm){
+    const sp = spokenNorm.split(' ').filter(Boolean);
+    const tg = targetNorm.split(' ').filter(Boolean);
+    if(tg.length === 0 || sp.length === 0) return false;
+
+    // كل كلمات الهدف موجودة في الكلام ← تطابق كافٍ
+    const allPresent = tg.every(w => sp.includes(w));
+    if(!allPresent) return false;
+
+    // آخر كلمة في الهدف يجب أن تكون آخر كلمة في الكلام (أو قريبة منها)
+    // هذا يمنع العدّ قبل الانتهاء من النطق
+    const lastTargetWord = tg[tg.length - 1];
+    const lastSpokenWord = sp[sp.length - 1];
+    // نقبل إذا آخر كلمة منطوقة هي آخر كلمة الهدف
+    // أو إذا الكلام لا يزيد بأكثر من كلمتين زائدتين بعد الهدف
+    const lastTargetIdx = sp.lastIndexOf(lastTargetWord);
+    if(lastTargetIdx === -1) return false;
+    const extraWords = sp.length - 1 - lastTargetIdx;
+    return extraWords <= 1; // كلمة زائدة واحدة مقبولة كـ "آمين" مثلاً
 }
 
 // ─── Create active record ─────────────────────────────────────────────────────
 function createRecord(name, target){
     let count     = 0;
     let listening = false;
-    let cooldown  = false;          // blocks duplicate within COOLDOWN_MS
+
+    // ── حالة مكافحة التكرار ──────────────────────────────────────────────────
+    // نستخدم نظام "مفتاح الجلسة" بدلاً من cooldown زمني بسيط:
+    // بمجرد أن يُعدّ الذكر من interim، نضع علامة countedThisUtterance=true
+    // ولا نعيد العدّ حتى تُصفَّر بعد isFinal أو بعد صمت قصير.
+    let countedThisUtterance = false;
+    let utteranceCooldownTimer = null;
+    const UTTERANCE_GAP_MS = 600; // ms صمت بعدها نقبل ذكراً جديداً
 
     const normalizedTarget = normalizeArabic(name);
-    const SCORE_THRESHOLD  = 0.85;  // 85 % of target tokens must be present
-    const COOLDOWN_MS      = 800;   // min ms between two accepted hits
 
     const box = document.createElement("div");
     box.className = "record";
@@ -470,6 +497,36 @@ function createRecord(name, target){
     const finishArea  = box.querySelector(".finish-area");
     const interimDisp = box.querySelector(".interim-display");
 
+    // ─── دالة العدّ المركزية ──────────────────────────────────────────────────
+    function registerHit(){
+        if(countedThisUtterance) return;
+        countedThisUtterance = true;
+
+        count++;
+        counter.textContent = count;
+        counter.animate(
+            [{transform:"scale(1.4)", color:"#43a047"},{transform:"scale(1)", color:"#1491ff"}],
+            {duration:180, fill:"forwards"}
+        );
+        // نعيد اللون بعد الأنيميشن
+        setTimeout(()=>{ counter.style.color = ""; }, 200);
+
+        if(count >= target){
+            stopListening();
+            const done = document.createElement("div");
+            done.className   = "completed";
+            done.textContent = `${name} - اكتمل العدد (${target}) 🎉`;
+            finishArea.innerHTML = "";
+            finishArea.appendChild(done);
+        }
+    }
+
+    // ─── إعادة تهيئة حالة الجملة ─────────────────────────────────────────────
+    function resetUtterance(){
+        countedThisUtterance = false;
+        clearTimeout(utteranceCooldownTimer);
+    }
+
     let recognition;
 
     if("webkitSpeechRecognition" in window || "SpeechRecognition" in window){
@@ -477,67 +534,64 @@ function createRecord(name, target){
         recognition = new SRClass();
         recognition.lang            = "ar-SA";
         recognition.continuous      = true;
-        recognition.interimResults  = true;   // show live feedback while speaking
-        recognition.maxAlternatives = 3;       // check multiple alternatives
+        recognition.interimResults  = true;    // ← العدّ الفوري من هنا
+        recognition.maxAlternatives = 3;
 
         recognition.onresult = function(event){
             for(let i = event.resultIndex; i < event.results.length; i++){
                 const result = event.results[i];
 
-                // ── Show interim transcript live ──────────────────────────
                 if(!result.isFinal){
-                    const interim = normalizeArabic(result[0].transcript);
-                    const sc = tokenScore(interim, normalizedTarget);
-                    interimDisp.textContent = result[0].transcript;
-                    interimDisp.className   = "interim-display" + (sc >= SCORE_THRESHOLD ? " match" : "");
-                    continue;
-                }
+                    // ═══════════════════════════════════════════════════════
+                    // النتيجة المؤقتة — هنا يحدث العدّ الفوري
+                    // ═══════════════════════════════════════════════════════
+                    const interimRaw  = result[0].transcript;
+                    const interimNorm = normalizeArabic(interimRaw);
+                    const matched     = containsFullZekr(interimNorm, normalizedTarget);
 
-                // ── Final result ──────────────────────────────────────────
-                interimDisp.textContent = "";
-                interimDisp.className   = "interim-display";
+                    // تحديث مؤشر الحالة المرئي
+                    interimDisp.textContent = interimRaw;
+                    interimDisp.className   = "interim-display" + (matched ? " match" : "");
 
-                if(cooldown) continue;   // ignore rapid fire
-
-                // Find best score among all alternatives
-                let bestScore = 0;
-                for(let a = 0; a < result.length; a++){
-                    const t = normalizeArabic(result[a].transcript);
-                    const s = tokenScore(t, normalizedTarget);
-                    if(s > bestScore) bestScore = s;
-                }
-
-                if(bestScore >= SCORE_THRESHOLD){
-                    cooldown = true;
-                    setTimeout(()=>{ cooldown = false; }, COOLDOWN_MS);
-
-                    count++;
-                    counter.textContent = count;
-                    counter.animate(
-                        [{transform:"scale(1.35)"},{transform:"scale(1)"}],
-                        {duration:160}
-                    );
-
-                    if(count >= target){
-                        stopListening();
-                        const done = document.createElement("div");
-                        done.className   = "completed";
-                        done.textContent = `${name} - اكتمل العدد (${target})`;
-                        finishArea.innerHTML = "";
-                        finishArea.appendChild(done);
+                    if(matched){
+                        // ✅ تطابق كامل — عدّ فوري
+                        registerHit();
+                        // ضبط مؤقت يُعيد السماح بعد صمت
+                        clearTimeout(utteranceCooldownTimer);
+                        utteranceCooldownTimer = setTimeout(resetUtterance, UTTERANCE_GAP_MS);
                     }
+
+                } else {
+                    // ═══════════════════════════════════════════════════════
+                    // النتيجة النهائية — تحقق إضافي فقط إذا لم يُعدّ بعد
+                    // ═══════════════════════════════════════════════════════
+                    interimDisp.textContent = "";
+                    interimDisp.className   = "interim-display";
+
+                    if(!countedThisUtterance){
+                        // المحرك أنهى الجملة ولم يُعدّ بعد — نفحص الـ alternatives
+                        let bestScore = 0;
+                        for(let a = 0; a < result.length; a++){
+                            const t = normalizeArabic(result[a].transcript);
+                            const s = tokenScore(t, normalizedTarget);
+                            if(s > bestScore) bestScore = s;
+                        }
+                        if(bestScore >= 0.85) registerHit();
+                    }
+
+                    // إعادة تهيئة للجملة القادمة
+                    resetUtterance();
                 }
             }
         };
 
         recognition.onerror = function(e){
-            // 'no-speech' fires normally during silence — ignore it
             if(e.error === "no-speech") return;
             stopListening();
         };
 
-        // Auto-restart so the session stays alive without gaps
         recognition.onend = function(){
+            // إعادة تشغيل تلقائية تُبقي الجلسة حية بلا فجوات
             if(listening) recognition.start();
         };
     }
@@ -555,6 +609,9 @@ function createRecord(name, target){
         toggleBtn.textContent = "تشغيل";
         toggleBtn.classList.remove("listening");
         if(recognition) recognition.stop();
+        resetUtterance();
+        interimDisp.textContent = "";
+        interimDisp.className   = "interim-display";
     }
 
     toggleBtn.addEventListener("click",()=>{
@@ -568,12 +625,10 @@ function createRecord(name, target){
 
     saveBtn.addEventListener("click",()=>{
         stopListening();
-
         const entry = { name, count, target, id: Date.now() };
         const arr   = loadSaved();
         arr.unshift(entry);
         persistSaved(arr);
-
         renderSavedEntry(entry);
         box.remove();
     });
@@ -604,7 +659,6 @@ function renderSavedEntry(entry){
 // ─── Load persisted records on page start ────────────────────────────────────
 (function init(){
     const arr = loadSaved();
-    // iterate oldest-first so prepend keeps newest at top
     for(let i = arr.length - 1; i >= 0; i--){
         renderSavedEntry(arr[i]);
     }
